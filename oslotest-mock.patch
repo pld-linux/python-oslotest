@@ -1,0 +1,101 @@
+--- oslotest-3.9.0/oslotest/mock_fixture.py.orig	2020-01-06 11:29:37.000000000 +0100
++++ oslotest-3.9.0/oslotest/mock_fixture.py	2024-02-22 21:36:47.580748811 +0100
+@@ -17,7 +17,14 @@
+ import functools
+ 
+ import fixtures
+-import mock
++try:
++    from unittest import mock
++    mock_module = mock
++    mock_module_name = 'unittest.mock'
++except ImportError:
++    import mock
++    mock_module = mock.mock
++    mock_module_name = 'mock'
+ 
+ 
+ def _lazy_autospec_method(mocked_method, original_method, eat_self):
+@@ -77,7 +77,7 @@ class _AutospecMockMixin(object):
+         original_attr = getattr(original_spec, name)
+         if callable(original_attr):
+             # lazily autospec callable attribute.
+-            eat_self = mock.mock._must_skip(original_spec, name,
++            eat_self = mock_module._must_skip(original_spec, name,
+                                             isinstance(original_spec, type))
+ 
+             _lazy_autospec_method(attr, original_attr, eat_self)
+@@ -115,15 +115,17 @@ class MockAutospecFixture(fixtures.Fixtu
+         super(MockAutospecFixture, self).setUp()
+ 
+         # patch both external and internal usage of Mock / MagicMock.
+-        self.useFixture(fixtures.MonkeyPatch('mock.Mock', _AutospecMock))
+-        self.useFixture(fixtures.MonkeyPatch('mock.mock.Mock', _AutospecMock))
+-        self.useFixture(fixtures.MonkeyPatch('mock.MagicMock',
+-                                             _AutospecMagicMock))
+-        self.useFixture(fixtures.MonkeyPatch('mock.mock.MagicMock',
+-                                             _AutospecMagicMock))
++        self.useFixture(fixtures.MonkeyPatch(mock_module_name+'.Mock', _AutospecMock))
++        if mock_module_name == 'mock':
++            self.useFixture(fixtures.MonkeyPatch('mock.mock.Mock', _AutospecMock))
++        self.useFixture(fixtures.MonkeyPatch(mock_module_name+'.MagicMock',
++                                             _AutospecMagicMock))
++        if mock_module_name == 'mock':
++            self.useFixture(fixtures.MonkeyPatch('mock.mock.MagicMock',
++                                                 _AutospecMagicMock))
+ 
+ 
+-class _patch(mock.mock._patch):
++class _patch(mock_module._patch):
+     """Patch class with working autospec functionality.
+ 
+     Currently, mock.patch functionality doesn't handle the autospec parameter
+@@ -164,7 +164,7 @@ class _patch(mock_module._patch):
+         if autospec:
+             target = self.getter()
+             original_attr = getattr(target, self.attribute)
+-            eat_self = mock.mock._must_skip(target, self.attribute,
++            eat_self = mock_module._must_skip(target, self.attribute,
+                                             isinstance(target, type))
+ 
+             new = super(_patch, self).__enter__()
+@@ -189,11 +191,11 @@ def _safe_attribute_error_wrapper(func):
+ 
+ def patch_mock_module():
+     """Replaces the mock.patch class."""
+-    mock.mock._patch = _patch
++    mock_module._patch = _patch
+ 
+     # NOTE(claudiub): mock cannot autospec partial functions properly,
+     # especially those created by LazyLoader objects (scheduler client),
+     # as it will try to copy the partial function's __name__ (which they do
+     # not have).
+-    mock.mock._copy_func_details = _safe_attribute_error_wrapper(
+-        mock.mock._copy_func_details)
++    mock_module._copy_func_details = _safe_attribute_error_wrapper(
++        mock_module._copy_func_details)
+--- oslotest-3.9.0/oslotest/tests/unit/test_mock_fixture.py.orig	2020-01-06 11:29:37.000000000 +0100
++++ oslotest-3.9.0/oslotest/tests/unit/test_mock_fixture.py	2024-02-22 21:17:21.007068683 +0100
+@@ -13,7 +13,10 @@
+ #    License for the specific language governing permissions and limitations
+ #    under the License.
+ 
+-import mock
++try:
++    from unittest import mock
++except ImportError:
++    import mock
+ import testtools
+ 
+ from oslotest import mock_fixture
+--- oslotest-3.9.0/requirements.txt.orig	2020-01-06 11:29:37.000000000 +0100
++++ oslotest-3.9.0/requirements.txt	2024-02-23 19:09:47.790460765 +0100
+@@ -7,7 +7,7 @@ python-subunit>=1.0.0 # Apache-2.0/BSD
+ six>=1.10.0 # MIT
+ stestr>=2.0.0 # Apache-2.0
+ testtools>=2.2.0 # MIT
+-mock>=2.0.0 # BSD
++mock>=2.0.0;python_version<'3.2'  # BSD
+ mox3>=0.20.0 # Apache-2.0
+ os-client-config>=1.28.0 # Apache-2.0
+ debtcollector>=1.2.0  # Apache-2.0
