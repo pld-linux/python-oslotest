@@ -10,7 +10,7 @@ Summary(pl.UTF-8):	Szkielet testów Oslo
 Name:		python-oslotest
 # keep 3.x here for python2 support
 Version:	3.9.0
-Release:	2
+Release:	3
 License:	Apache v2.0
 Group:		Libraries/Python
 #Source0Download: https://pypi.org/simple/oslotest/
